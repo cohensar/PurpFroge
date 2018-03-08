@@ -70,6 +70,8 @@ class Interpreter(object):
     # Create Objects Directory
     def __init__(self):
         self.objects = dict()
+        self.exeStack = [] #list of tuples of ints in the form (start, end, return, type)
+        self.pointer = 0
 
     # Create object class
     class PurpFrogeObject(object):
@@ -314,16 +316,29 @@ class Interpreter(object):
                 print("Did not eval in DO return")
         return ans
 
+    # Counts indents at the beginning of a line
+    def count_indents(self, line):
+        count = 0
+        for char in line:
+            if char == ">":
+                count += 1
+            else:
+                break
+        return count
+
     # Interpret a document
     def run(self):
         # If there is a doc, read in the doc
         if len(sys.argv) > 1:
             with open(sys.argv[1]) as f:
                 content = f.readlines()
-            content = [x.strip() for x in content if len(x.strip()) > 0]
-            is_chunked = [x[0] == ">" for x in content]
-            keep_going = True
+            self.content = [x.strip() for x in content if len(x.strip()) > 0]
+            self.indent_count = [self.count_indents(x) for x in content]
+            self.exeStack.append((0, len(content) - 1, None, "main"))
+            #pointer = 0 Moved to be class var
+            #keep_going = True
             # Read line by line
+            """
             for i in range(len(content)):
                 line = content[i]
                 if keep_going == "for":
@@ -342,6 +357,33 @@ class Interpreter(object):
                         self.interpret(input(">"))
                 elif keep_going:
                     keep_going = self.interpret(line)
+            """
+            while len(self.exeStack) > 0:
+
+                line = content[self.pointer]
+                blah = self.interpret(line)
+
+                self.pointer += 1
+
+                print(str(self.pointer) + " --- " + line[0:-1] + " --- " + str(self.exeStack))
+                while (self.exeStack and self.pointer == self.exeStack[-1][1]):
+                    if (self.exeStack[-1][3] == "while"):
+                        while_line = content[self.exeStack[-1][0]].split()[1:-1]
+                        print(while_line)
+                        if self.interpret(" ".join(while_line)):
+                            self.pointer = self.exeStack[-1][0] + 1
+                        else:
+                            self.pointer = self.exeStack.pop(-1)[2]
+                    elif (self.exeStack[-1][3] == "for"):
+                        #FIGURE OUT WHAT TEH HECKERS FOR LOOPS ARE TODO
+                        pass
+                    else:
+                        self.pointer = self.exeStack.pop(-1)[2]
+
+            print("~end of script~")
+            while True:
+                self.interpret(input(">"))
+
         else:
             print("Welcome to PurpFroge!")
             print("~~~~~~~~~~~~~~~~~~~~~")
@@ -459,9 +501,16 @@ class Interpreter(object):
         eval('self.objects["{}"].{}("{}")'.format(subject[::-1][0], verb, self.do(direct_obj, verb)))
         return True
 
+    def scan_for_end(self, pointer):
+        end = pointer + 1
+        while self.indent_count[end] > self.indent_count[pointer]:
+            end += 1
+        return end
+
     def interpret(self, line):
         # Assume legitamite instructions
         global show_line
+
         show_line = False
         line_len = len(line) - 1
         if line_len < 0:
@@ -504,19 +553,35 @@ class Interpreter(object):
                 if ":" not in line:
                     print("I'm not sure what you're trying to do but you said {} and you don't have a :".format(key_word))
                     return False
+                end = self.scan_for_end(self.pointer)
                 if key_word == "for":
                     print(line)
+                    self.exeStack.append((self.pointer, end, end, "for"))
                     return "for"
+                if key_word == "while":
+                    print(line)
+                    self.exeStack.append((self.pointer, end, end, "while"))
+                    return "while"
                 if self.interpret(" ".join(split_line[1:len(split_line)])):
+                    print(line)
+                    if ("else" in content[end].split()): # Check if there is an else
+                        self.exeStack.appned((self.pointer, end, self.scan_for_end(end), "if"))
+                    else:
+                        self.exeStack.append((self.pointer, end, end, "if"))
                     return "run chunk"
                 else:
+                    print(line)
+                    self.pointer = end
+                    if ("else" in content[end].split()): # Check if there is an else
+                        self.exeStack.appned((end, self.scan_for_end(end)-1, self.scan_for_end(end), "if"))
                     return "skip chunk"
         # If it's an inline expression try to evaluate
         if "please" not in line and "for" not in line and "while" not in line and "if" not in line:
             try:
                 translated = self.create_exp(line)
-                print(eval(translated))
-                return True
+                ev = eval(translated)
+                print(ev)
+                return ev
             except SyntaxError:
                 "Sorry I didn't understand that. Type 'h' for help or try again."
                 return False
