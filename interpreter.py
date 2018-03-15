@@ -373,7 +373,7 @@ class Interpreter(object):
 
                 line = content[self.pointer]
                 #print the pointer, line number, and stack at each line.
-                print("*** " + str(self.pointer) + " --- " + line[0:-1] + " --- " + str(self.exeStack))
+                #print("[DEBUG]: Running line #" + str(self.pointer) + " : \"" + line[0:-1] + "\" \n\t Current stack: " + str(self.exeStack))
                 blah = self.interpret(line)
 
                 self.pointer += 1
