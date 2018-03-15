@@ -289,26 +289,37 @@ class Interpreter(object):
             return string
         if len(stringy) == 1:
             return stringy[0]
+        quote = False
         for i in range(len(stringy)):
             if not isKey(stringy[i]):
                 if stringy[i] in self.objects:
                     if operation == "size":
-                        stringy[i] = "self.objects['" + stringy[i] + "'].size()"
+                        stringy[i] = 'self.objects["' + stringy[i] + '"].size()'
                     else:
-                        stringy[i] = "self.objects['" + stringy[i] + "'].get_value()"
+                        stringy[i] = 'self.objects["' + stringy[i] + '"].get_value()'
                     if stringy[i - 1] in cont_types:
                         stringy[i - 2] = ""
                     stringy[i - 1] = ""
-                elif '"' not in stringy[i]:
+                elif stringy[i] == '"':
+                    if quote:
+                        quote = False
+                    else:
+                        quote = True
+                elif quote:
+                    pass
+                else:
                     print("Sorry did not recognize the object " + stringy[i])
                     return "''"
-        return " ".join(stringy)
+        if quote:
+            print("Did not find closing parenthesis.")
+            return "''"
+        return " ".join(stringy).strip()
 
     # Format the Direct Object of an operation
     def do(self, direct_obj, operation):
         ans = self.create_exp(direct_obj, operation)
         if operation in ["hold", "size"]:
-            if "'" in ans[0] or '"' in ans[0]:
+            if '"' in ans[0]:
                 return ans
             try:
                 return eval(ans)
@@ -334,7 +345,7 @@ class Interpreter(object):
                 content = f.readlines()
             self.content = [x.strip() for x in content if len(x.strip()) > 0]
             self.indent_count = [self.count_indents(x) for x in content]
-            self.exeStack.append((0, len(content) - 1, None, "main"))
+            self.exeStack.append((0, len(content), None, "main"))
             #pointer = 0 Moved to be class var
             #keep_going = True
             # Read line by line
@@ -361,15 +372,15 @@ class Interpreter(object):
             while len(self.exeStack) > 0:
 
                 line = content[self.pointer]
+                #print the pointer, line number, and stack at each line.
+                print("*** " + str(self.pointer) + " --- " + line[0:-1] + " --- " + str(self.exeStack))
                 blah = self.interpret(line)
 
                 self.pointer += 1
 
-                print(str(self.pointer) + " --- " + line[0:-1] + " --- " + str(self.exeStack))
                 while (self.exeStack and self.pointer == self.exeStack[-1][1]):
                     if (self.exeStack[-1][3] == "while"):
                         while_line = content[self.exeStack[-1][0]].split()[1:-1]
-                        print(while_line)
                         if self.interpret(" ".join(while_line)):
                             self.pointer = self.exeStack[-1][0] + 1
                         else:
@@ -481,11 +492,13 @@ class Interpreter(object):
 
     # Find Subject Verb and DO
     def run_please_line(self, split_line):
+        """
         if split_line[0][0] == "(":
             start = split_line[0]
             end = split_line[::-1][0]
             start = start[1:len(start)]
             end = end[0:len(end)-1]
+            """
         please = split_line.index("please")
         if please == 0:
             self.computer_please(split_line[1], split_line[2:])
@@ -494,11 +507,12 @@ class Interpreter(object):
         subject = split_line[0: please]
         verb = split_line[please + 1]
         direct_obj = " ".join(split_line[please + 2:])
-        direct_obj = direct_obj[1 : len(direct_obj) - 1].split()
+        direct_obj = direct_obj[1: len(direct_obj) - 1].split()
         if "please" in direct_obj:
             direct_obj = self.run_please_line(direct_obj)
         direct_obj = " ".join(direct_obj)
-        eval('self.objects["{}"].{}("{}")'.format(subject[::-1][0], verb, self.do(direct_obj, verb)))
+        print("self.objects['{}'].{}('{}')".format(subject[::-1][0], verb, self.do(direct_obj, verb)))
+        eval("self.objects['{}'].{}('{}')".format(subject[::-1][0], verb, self.do(direct_obj, verb)))
         return True
 
     def scan_for_end(self, pointer):
@@ -508,7 +522,7 @@ class Interpreter(object):
         return end
 
     def interpret(self, line):
-        # Assume legitamite instructions
+        # Assume legitimate instructions
         global show_line
 
         show_line = False
