@@ -279,7 +279,7 @@ class Interpreter(object):
             newobj = self.PurpFrogeObject(self.objects, *inpt)
         self.objects[newobj.name] = newobj
 
-    # Create a python expression from a purp froge
+    # Create a python expression from a purp froge expression
     def create_exp(self, string, operation="Eval"):
         if string.find("(") > 0:
             string = self.chunk_by_paren(string, operation)
@@ -289,10 +289,14 @@ class Interpreter(object):
             return string
         if len(stringy) == 1:
             return stringy[0]
+
         quote = False
+        indent_over = False
+
         for i in range(len(stringy)):
             if not isKey(stringy[i]):
-                if stringy[i] in self.objects:
+                indent_over = True
+                if stringy[i] in self.objects:  # If reference to object replace with python object
                     if operation == "size":
                         stringy[i] = 'self.objects["' + stringy[i] + '"].size()'
                     else:
@@ -300,16 +304,18 @@ class Interpreter(object):
                     if stringy[i - 1] in cont_types:
                         stringy[i - 2] = ""
                     stringy[i - 1] = ""
-                elif stringy[i] == '"':
+                elif stringy[i] == '"':  # Check if we are in the middle of a quote
                     if quote:
                         quote = False
                     else:
                         quote = True
-                elif quote:
+                elif quote:  # If in a string do nothing
                     pass
                 else:
                     print("Sorry did not recognize the object " + stringy[i])
                     return "''"
+            elif not indent_over and stringy[i] == ">":
+                stringy[i] = ""  # Remove indents from expression
         if quote:
             print("Did not find closing parenthesis.")
             return "''"
@@ -346,42 +352,22 @@ class Interpreter(object):
             self.content = [x.strip() for x in content if len(x.strip()) > 0]
             self.indent_count = [self.count_indents(x) for x in content]
             self.exeStack.append((0, len(content), None, "main"))
-            #pointer = 0 Moved to be class var
-            #keep_going = True
-            # Read line by line
-            """
-            for i in range(len(content)):
-                line = content[i]
-                if keep_going == "for":
-                    pass
-                elif keep_going == "skip chunk":
-                    if is_chunked[i]:
-                        print("Skipping unmet condition")
-                        pass
-                    else:
-                        keep_going = self.interpret(line)
-                elif keep_going == "run chunk":
-                    pass
-                elif not keep_going:
-                    print("~end of script~")
-                    while True:
-                        self.interpret(input(">"))
-                elif keep_going:
-                    keep_going = self.interpret(line)
-            """
+
+            # Read line by line with instruction control on stack
             while len(self.exeStack) > 0:
 
                 line = content[self.pointer]
-                #print the pointer, line number, and stack at each line.
-                #print("[DEBUG]: Running line #" + str(self.pointer) + " : \"" + line[0:-1] + "\" \n\t Current stack: " + str(self.exeStack))
-                blah = self.interpret(line)
+                # Prints the pointer, line number, and stack at each line.
+                # print("[DEBUG]: Running line #" + str(self.pointer) + " : \"" + line[0:-1] + "\" \n\t Current stack: " + str(self.exeStack))
+                self.interpret(line)  # Run the line of code
 
                 self.pointer += 1
 
+                # Check for control flow changes
                 while (self.exeStack and self.pointer == self.exeStack[-1][1]):
                     if (self.exeStack[-1][3] == "while"):
                         while_line = content[self.exeStack[-1][0]].split()[1:-1]
-                        if self.interpret(" ".join(while_line)):
+                        if self.interpret(" ".join(while_line) + " ;"):
                             self.pointer = self.exeStack[-1][0] + 1
                         else:
                             self.pointer = self.exeStack.pop(-1)[2]
@@ -570,30 +556,31 @@ class Interpreter(object):
                 if key_word == "for":
                     print(line)
                     self.exeStack.append((self.pointer, end, end, "for"))
-                    return "for"
+                    return True
                 if key_word == "while":
                     print(line)
                     self.exeStack.append((self.pointer, end, end, "while"))
-                    return "while"
+                    return True
                 if self.interpret(" ".join(split_line[1:len(split_line)])):
                     print(line)
                     if ("else" in content[end].split()): # Check if there is an else
                         self.exeStack.appned((self.pointer, end, self.scan_for_end(end), "if"))
                     else:
                         self.exeStack.append((self.pointer, end, end, "if"))
-                    return "run chunk"
+                    return True
                 else:
                     print(line)
                     self.pointer = end
                     if ("else" in content[end].split()): # Check if there is an else
                         self.exeStack.appned((end, self.scan_for_end(end)-1, self.scan_for_end(end), "if"))
-                    return "skip chunk"
+                    return True
         # If it's an inline expression try to evaluate
         if "please" not in line and "for" not in line and "while" not in line and "if" not in line:
             try:
                 translated = self.create_exp(line)
                 ev = eval(translated)
-                print(ev)
+                if show_line:
+                    print(ev)
                 return ev
             except SyntaxError:
                 "Sorry I didn't understand that. Type 'h' for help or try again."
