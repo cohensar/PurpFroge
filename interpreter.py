@@ -511,7 +511,6 @@ class Interpreter(object):
         if "please" in direct_obj:
             direct_obj = self.run_please_line(direct_obj)
         direct_obj = " ".join(direct_obj)
-        print("self.objects['{}'].{}('{}')".format(subject[::-1][0], verb, self.do(direct_obj, verb)))
         eval("self.objects['{}'].{}('{}')".format(subject[::-1][0], verb, self.do(direct_obj, verb)))
         return True
 
