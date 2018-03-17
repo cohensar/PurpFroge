@@ -1,0 +1,7 @@
+box : int : *EMPTY*
+ERROR: variable of type int and value of type str
+Probably causes beyond the above include:
+trying to initialze an object to 'be' something when an ingredient hasn't been initialized.
+box : int : *EMPTY*
+*EMPTY*
+~end of script~
